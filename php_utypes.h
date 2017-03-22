@@ -12,7 +12,7 @@
   | obtain it through the world-wide-web, please send a note to          |
   | license@php.net so we can mail you a copy immediately.               |
   +----------------------------------------------------------------------+
-  | Author:                                                              |
+  | Author: krakjoe                                                      |
   +----------------------------------------------------------------------+
 */
 
@@ -24,7 +24,7 @@
 extern zend_module_entry utypes_module_entry;
 #define phpext_utypes_ptr &utypes_module_entry
 
-#define PHP_UTYPES_VERSION "0.1.0" /* Replace with version number for your extension */
+#define PHP_UTYPES_VERSION "0.1.0"
 
 #ifdef PHP_WIN32
 #	define PHP_UTYPES_API __declspec(dllexport)

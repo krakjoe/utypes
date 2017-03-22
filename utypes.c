@@ -12,7 +12,7 @@
   | obtain it through the world-wide-web, please send a note to          |
   | license@php.net so we can mail you a copy immediately.               |
   +----------------------------------------------------------------------+
-  | Author: krakjoe                                                             |
+  | Author: krakjoe                                                      |
   +----------------------------------------------------------------------+
 */
 
@@ -30,6 +30,9 @@
 #if PHP_VERSION_ID < 70200
 #define ZEND_TYPE_IS_CLASS(i)    ((i).type_hint == IS_OBJECT)
 #define ZEND_TYPE_NAME(i)        ((i).class_name)
+#define PHP_UTYPE(t)             (t)
+#elif PHP_VERSION_ID >= 70200
+#define PHP_UTYPE(t)             (t).type
 #endif
 
 ZEND_DECLARE_MODULE_GLOBALS(utypes);
@@ -77,11 +80,11 @@ static inline int php_utypes_args(zend_execute_data *execute_data, zend_function
 	switch (opline->opcode) {
 		case ZEND_RECV:	
 		case ZEND_RECV_INIT:
-			if (!ZEND_TYPE_IS_CLASS(func->common.arg_info[opline->op1.num-1])) {
+			if (!ZEND_TYPE_IS_CLASS(PHP_UTYPE(func->common.arg_info[opline->op1.num-1]))) {
 				return FAILURE;
 			}
 
-			ZVAL_STR(&name, ZEND_TYPE_NAME(func->common.arg_info[opline->op1.num-1]));
+			ZVAL_STR(&name, ZEND_TYPE_NAME(PHP_UTYPE(func->common.arg_info[opline->op1.num-1])));
 
 			zend_fcall_info_argn(fci, 2, &name, ZEND_CALL_ARG(execute_data, opline->op1.num));
 
@@ -92,11 +95,11 @@ static inline int php_utypes_args(zend_execute_data *execute_data, zend_function
 			zval params, *variadic;
 			uint32_t n = opline->op1.num, c = ZEND_CALL_NUM_ARGS(execute_data);
 
-			if (!ZEND_TYPE_IS_CLASS(func->common.arg_info[opline->op1.num-1])) {
+			if (!ZEND_TYPE_IS_CLASS(PHP_UTYPE(func->common.arg_info[opline->op1.num-1]))) {
 				return FAILURE;
 			}
 
-			ZVAL_STR(&name, ZEND_TYPE_NAME(func->common.arg_info[opline->op1.num-1]));
+			ZVAL_STR(&name, ZEND_TYPE_NAME(PHP_UTYPE(func->common.arg_info[opline->op1.num-1])));
 
 			array_init(&params);
 
@@ -120,11 +123,11 @@ static inline int php_utypes_args(zend_execute_data *execute_data, zend_function
 		case ZEND_VERIFY_RETURN_TYPE: {
 			zval nil, *value = &nil;
 
-			if (!ZEND_TYPE_IS_CLASS(func->common.arg_info[-1])) {
+			if (!ZEND_TYPE_IS_CLASS(PHP_UTYPE(func->common.arg_info[-1]))) {
 				return FAILURE;
 			}
 
-			ZVAL_STR(&name, ZEND_TYPE_NAME(func->common.arg_info[-1]));
+			ZVAL_STR(&name, ZEND_TYPE_NAME(PHP_UTYPE(func->common.arg_info[-1])));
 
 			if (opline->op1_type == IS_CONST) {
 				value = EX_CONSTANT(opline->op1);
