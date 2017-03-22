@@ -1,6 +1,8 @@
 utypes
 =====
 
+[![Build Status](https://travis-ci.org/krakjoe/utypes.svg?branch=master)](https://travis-ci.org/krakjoe/utypes)
+
 utypes allows the user to hook into type verification at function entry (params) and exit (return) and handle the verification in user land.
 
 API
