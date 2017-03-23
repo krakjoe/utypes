@@ -4,7 +4,7 @@ utypes recv pass
 <?php if (!extension_loaded("utypes")) print "skip"; ?>
 --FILE--
 <?php 
-utypes(function(string $type, $value){
+utypes\handler(function(string $type, $value){
 	switch ($type) {
 		case "fake":
 			return true;

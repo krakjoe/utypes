@@ -24,7 +24,7 @@
 extern zend_module_entry utypes_module_entry;
 #define phpext_utypes_ptr &utypes_module_entry
 
-#define PHP_UTYPES_VERSION "0.1.0"
+#define PHP_UTYPES_VERSION "0.2.0"
 
 #ifdef PHP_WIN32
 #	define PHP_UTYPES_API __declspec(dllexport)
@@ -43,6 +43,7 @@ ZEND_BEGIN_MODULE_GLOBALS(utypes)
 	zend_fcall_info fci;
 	zend_fcall_info_cache fcc;
 	zend_bool busy;
+	HashTable named;
 ZEND_END_MODULE_GLOBALS(utypes)
 
 #define UTG(v) ZEND_MODULE_GLOBALS_ACCESSOR(utypes, v)

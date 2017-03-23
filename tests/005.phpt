@@ -4,7 +4,7 @@ utypes recv init
 <?php if (!extension_loaded("utypes")) print "skip"; ?>
 --FILE--
 <?php 
-utypes(function(string $type, $value){
+utypes\handler(function(string $type, $value){
 	var_dump($type, $value);
 
 	return true;

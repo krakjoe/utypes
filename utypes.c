@@ -28,17 +28,21 @@
 #include "php_utypes.h"
 
 #if PHP_VERSION_ID < 70200
-#define ZEND_TYPE_IS_CLASS(i)    ((i).type_hint == IS_OBJECT)
-#define ZEND_TYPE_NAME(i)        ((i).class_name)
-#define PHP_UTYPE(t)             (t)
+#define ZEND_TYPE_IS_CLASS(i)        ((i).type_hint == IS_OBJECT)
+#define ZEND_TYPE_NAME(i)            ((i).class_name)
+#define PHP_UTYPE(t)                 (t)
+#define PHP_UTYPE_CODE(t)			 (t).type_hint
 #elif PHP_VERSION_ID >= 70200
-#define PHP_UTYPE(t)             (t).type
+#define PHP_UTYPE(t)                 (t).type
+#define PHP_UTYPE_CODE(t)			 ZEND_TYPE_CODE(t)
 #endif
+
+#define PHP_UTYPE_CODE_MATCH(a, b)	 ZEND_SAME_FAKE_TYPE(PHP_UTYPE_CODE(a), PHP_UTYPE_CODE(b))
 
 ZEND_DECLARE_MODULE_GLOBALS(utypes);
 
-/* {{{ proto void utypes(callable handler) */
-PHP_FUNCTION(utypes)
+/* {{{ proto bool utypes\handler(callable handler) */
+PHP_FUNCTION(handler)
 {
 	zval *callback;
 	zend_fcall_info fci = empty_fcall_info;
@@ -49,7 +53,7 @@ PHP_FUNCTION(utypes)
 	}
 
 	if (zend_fcall_info_init(callback, IS_CALLABLE_CHECK_SILENT, &fci, &fcc, NULL, NULL) != SUCCESS) {
-		return;
+		RETURN_FALSE;
 	}
 
 	if (Z_TYPE(UTG(callback))) {
@@ -60,8 +64,107 @@ PHP_FUNCTION(utypes)
 	memcpy(&UTG(fcc), &fcc, sizeof(zend_fcall_info_cache));
 
 	ZVAL_COPY(&UTG(callback), callback);
+
+	RETURN_TRUE;
 }
 /* }}} */
+
+/* {{{ */
+static inline void php_utypes_verify(zend_function *handler, zend_function *interface, zval *return_value) {
+	uint32_t arg = 0, end = interface->common.num_args;
+
+	if (interface->common.fn_flags & ZEND_ACC_HAS_RETURN_TYPE) {
+		if (!(handler->common.fn_flags & ZEND_ACC_HAS_RETURN_TYPE)) {
+			RETURN_FALSE;
+		}
+
+		if (!PHP_UTYPE_CODE_MATCH(handler->common.arg_info[-1], interface->common.arg_info[-1])) {
+			RETURN_FALSE;
+		}
+
+		if (PHP_UTYPE_CODE(handler->common.arg_info[-1]) == IS_OBJECT) {
+			if (!zend_string_equals_ci(
+					ZEND_TYPE_NAME(handler->common.arg_info[-1]), 
+					ZEND_TYPE_NAME(interface->common.arg_info[-1]))) {
+				RETURN_FALSE;
+			}
+		}
+	}
+
+	if (interface->common.fn_flags & ZEND_ACC_RETURN_REFERENCE) {
+		if (!(handler->common.fn_flags & ZEND_ACC_RETURN_REFERENCE)) {
+			RETURN_FALSE;
+		}
+	}
+
+	if (interface->common.fn_flags & ZEND_ACC_VARIADIC) {
+		if (!(handler->common.fn_flags & ZEND_ACC_VARIADIC)) {
+			RETURN_FALSE;
+		}
+	}
+
+	if (interface->common.required_num_args < handler->common.required_num_args ||
+		interface->common.num_args > handler->common.num_args) {
+		RETURN_FALSE;
+	}
+
+	if (interface->common.fn_flags & ZEND_ACC_VARIADIC) {
+		end++;
+	}
+
+	if (handler->common.num_args >= interface->common.num_args) {
+		end = handler->common.num_args;
+
+		if (handler->common.fn_flags & ZEND_ACC_VARIADIC) {
+			end++;
+		}
+	}
+
+	while (arg < end) {
+		if (!PHP_UTYPE_CODE_MATCH(handler->common.arg_info[arg], interface->common.arg_info[arg])) {
+			RETURN_FALSE;
+		}
+
+		if (PHP_UTYPE_CODE(handler->common.arg_info[arg]) == IS_OBJECT) {
+			if (!zend_string_equals_ci(
+					ZEND_TYPE_NAME(handler->common.arg_info[arg]), 
+					ZEND_TYPE_NAME(interface->common.arg_info[arg]))) {
+				RETURN_FALSE;
+			}
+		}
+
+		arg++;
+	}
+
+	RETURN_TRUE;
+} /* }}} */
+
+/* {{{ proto bool utypes\verify(callable function, string interface) */
+PHP_FUNCTION(verify)
+{
+	zend_fcall_info fci = empty_fcall_info;
+	zend_fcall_info_cache fcc = empty_fcall_info_cache;
+	zend_class_entry *interface = NULL;
+	zend_function *function = NULL;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "fC", &fci, &fcc, &interface) != SUCCESS) {
+		return;	
+	}
+
+	if (zend_hash_num_elements(&interface->function_table) != 1) {
+		RETURN_FALSE;
+	}
+
+	ZEND_HASH_FOREACH_PTR(&interface->function_table, function) {
+		break;
+	} ZEND_HASH_FOREACH_END();
+
+	if (!function || function->type != ZEND_USER_FUNCTION) {
+		return;
+	}
+
+	php_utypes_verify(fcc.function_handler, function, return_value);
+} /* }}} */
 
 /* {{{ php_utypes_init_globals
  */
@@ -184,7 +287,7 @@ static inline void php_utypes_enter(zval *rv) {
 } /* }}} */
 
 /* {{{ */
-static inline int php_utypes_leave(int value) {
+static inline int php_utypes_leave(int action) {
 	UTG(busy) = 0;
 
 	if (UTG(fci).param_count) {
@@ -197,7 +300,7 @@ static inline int php_utypes_leave(int value) {
 		ZVAL_UNDEF(UTG(fci).retval);
 	}
 
-	return value;
+	return action;
 } /* }}} */
 
 /* {{{ */
@@ -290,14 +393,20 @@ PHP_MINFO_FUNCTION(utypes)
 }
 /* }}} */
 
-ZEND_BEGIN_ARG_INFO_EX(php_utypes_arginfo, 0, 0, 1)
+ZEND_BEGIN_ARG_INFO_EX(php_utypes_handler_arginfo, 0, 0, 1)
 	ZEND_ARG_CALLABLE_INFO(0, callback, 0)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(php_utypes_verify_arginfo, 0, 0, 2)
+	ZEND_ARG_CALLABLE_INFO(0, function, 0)
+	ZEND_ARG_TYPE_INFO(0, interface, IS_STRING, 0)
 ZEND_END_ARG_INFO()
 
 /* {{{ utypes_functions[]
  */
 const zend_function_entry utypes_functions[] = {
-	PHP_FE(utypes,	php_utypes_arginfo)
+	ZEND_NS_FE("utypes", handler,	php_utypes_handler_arginfo)
+	ZEND_NS_FE("utypes", verify,	php_utypes_verify_arginfo)
 	PHP_FE_END
 };
 /* }}} */
