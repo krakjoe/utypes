@@ -34,7 +34,7 @@
 #define PHP_UTYPE_CODE(t)			 (t).type_hint
 #elif PHP_VERSION_ID >= 70200
 #define PHP_UTYPE(t)                 (t).type
-#define PHP_UTYPE_CODE(t)			 ZEND_TYPE_CODE(t)
+#define PHP_UTYPE_CODE(t)			 ZEND_TYPE_CODE(PHP_UTYPE(t))
 #endif
 
 #define PHP_UTYPE_CODE_MATCH(a, b)	 ZEND_SAME_FAKE_TYPE(PHP_UTYPE_CODE(a), PHP_UTYPE_CODE(b))
