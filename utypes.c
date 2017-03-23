@@ -28,13 +28,15 @@
 #include "php_utypes.h"
 
 #if PHP_VERSION_ID < 70200
-#define ZEND_TYPE_IS_CLASS(i)        ((i).type_hint == IS_OBJECT)
-#define ZEND_TYPE_NAME(i)            ((i).class_name)
 #define PHP_UTYPE(t)                 (t)
 #define PHP_UTYPE_CODE(t)			 (t).type_hint
+#define PHP_UTYPE_NAME(t)            (t).class_name
+#define PHP_UTYPE_IS_CLASS(t)        (PHP_UTYPE_CODE(t) == IS_OBJECT)
 #elif PHP_VERSION_ID >= 70200
 #define PHP_UTYPE(t)                 (t).type
 #define PHP_UTYPE_CODE(t)			 ZEND_TYPE_CODE(PHP_UTYPE(t))
+#define PHP_UTYPE_NAME(t)			 ZEND_TYPE_NAME(PHP_UTYPE(t))
+#define PHP_UTYPE_IS_CLASS(t)		 ZEND_TYPE_IS_CLASS(PHP_UTYPE(t))
 #endif
 
 #define PHP_UTYPE_CODE_MATCH(a, b)	 ZEND_SAME_FAKE_TYPE(PHP_UTYPE_CODE(a), PHP_UTYPE_CODE(b))
@@ -78,14 +80,14 @@ static inline void php_utypes_verify(zend_function *handler, zend_function *inte
 			RETURN_FALSE;
 		}
 
-		if (!PHP_UTYPE_CODE_MATCH(handler->common.arg_info[-1], interface->common.arg_info[-1])) {
-			RETURN_FALSE;
-		}
-
-		if (PHP_UTYPE_CODE(handler->common.arg_info[-1]) == IS_OBJECT) {
+		if (PHP_UTYPE_IS_CLASS(handler->common.arg_info[-1])) {
 			if (!zend_string_equals_ci(
-					ZEND_TYPE_NAME(handler->common.arg_info[-1]), 
-					ZEND_TYPE_NAME(interface->common.arg_info[-1]))) {
+					PHP_UTYPE_NAME(handler->common.arg_info[-1]), 
+					PHP_UTYPE_NAME(interface->common.arg_info[-1]))) {
+				RETURN_FALSE;
+			}
+		} else {
+			if (!PHP_UTYPE_CODE_MATCH(handler->common.arg_info[-1], interface->common.arg_info[-1])) {
 				RETURN_FALSE;
 			}
 		}
@@ -121,14 +123,14 @@ static inline void php_utypes_verify(zend_function *handler, zend_function *inte
 	}
 
 	while (arg < end) {
-		if (!PHP_UTYPE_CODE_MATCH(handler->common.arg_info[arg], interface->common.arg_info[arg])) {
-			RETURN_FALSE;
-		}
-
-		if (PHP_UTYPE_CODE(handler->common.arg_info[arg]) == IS_OBJECT) {
+		if (PHP_UTYPE_IS_CLASS(handler->common.arg_info[arg])) {
 			if (!zend_string_equals_ci(
-					ZEND_TYPE_NAME(handler->common.arg_info[arg]), 
-					ZEND_TYPE_NAME(interface->common.arg_info[arg]))) {
+					PHP_UTYPE_NAME(handler->common.arg_info[arg]), 
+					PHP_UTYPE_NAME(interface->common.arg_info[arg]))) {
+				RETURN_FALSE;
+			}
+		} else {
+			if (!PHP_UTYPE_CODE_MATCH(handler->common.arg_info[arg], interface->common.arg_info[arg])) {
 				RETURN_FALSE;
 			}
 		}
@@ -183,11 +185,11 @@ static inline int php_utypes_args(zend_execute_data *execute_data, zend_function
 	switch (opline->opcode) {
 		case ZEND_RECV:	
 		case ZEND_RECV_INIT:
-			if (!ZEND_TYPE_IS_CLASS(PHP_UTYPE(func->common.arg_info[opline->op1.num-1]))) {
+			if (!PHP_UTYPE_IS_CLASS(func->common.arg_info[opline->op1.num-1])) {
 				return FAILURE;
 			}
 
-			ZVAL_STR(&name, ZEND_TYPE_NAME(PHP_UTYPE(func->common.arg_info[opline->op1.num-1])));
+			ZVAL_STR(&name, PHP_UTYPE_NAME(func->common.arg_info[opline->op1.num-1]));
 
 			zend_fcall_info_argn(fci, 2, &name, ZEND_CALL_ARG(execute_data, opline->op1.num));
 
@@ -198,11 +200,11 @@ static inline int php_utypes_args(zend_execute_data *execute_data, zend_function
 			zval params, *variadic;
 			uint32_t n = opline->op1.num, c = ZEND_CALL_NUM_ARGS(execute_data);
 
-			if (!ZEND_TYPE_IS_CLASS(PHP_UTYPE(func->common.arg_info[opline->op1.num-1]))) {
+			if (!PHP_UTYPE_IS_CLASS(func->common.arg_info[opline->op1.num-1])) {
 				return FAILURE;
 			}
 
-			ZVAL_STR(&name, ZEND_TYPE_NAME(PHP_UTYPE(func->common.arg_info[opline->op1.num-1])));
+			ZVAL_STR(&name, PHP_UTYPE_NAME(func->common.arg_info[opline->op1.num-1]));
 
 			array_init(&params);
 
@@ -226,11 +228,11 @@ static inline int php_utypes_args(zend_execute_data *execute_data, zend_function
 		case ZEND_VERIFY_RETURN_TYPE: {
 			zval nil, *value = &nil;
 
-			if (!ZEND_TYPE_IS_CLASS(PHP_UTYPE(func->common.arg_info[-1]))) {
+			if (!PHP_UTYPE_IS_CLASS(func->common.arg_info[-1])) {
 				return FAILURE;
 			}
 
-			ZVAL_STR(&name, ZEND_TYPE_NAME(PHP_UTYPE(func->common.arg_info[-1])));
+			ZVAL_STR(&name, PHP_UTYPE_NAME(func->common.arg_info[-1]));
 
 			if (opline->op1_type == IS_CONST) {
 				value = EX_CONSTANT(opline->op1);
